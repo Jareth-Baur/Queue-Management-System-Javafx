@@ -17,6 +17,7 @@
         </repository>
     </repositories>
     <dependencies>
+        
         <!-- JUnit for testing -->      
         <!-- WebSocket dependency -->
         <dependency>
@@ -60,6 +61,12 @@
             <artifactId>mysql-connector-java</artifactId>
             <version>8.0.29</version>
         </dependency>
+        
+        <dependency>
+            <groupId>org.apache.pdfbox</groupId>
+            <artifactId>pdfbox</artifactId>
+            <version>3.0.3</version> <!-- Or latest version -->
+        </dependency>
 
        
         <!--        <dependency>
@@ -67,11 +74,6 @@
             <artifactId>voice-cmu-slt-hsmm</artifactId>
             <version>5.2.1</version>
         </dependency>-->
-        <dependency>
-            <groupId>mysql</groupId>
-            <artifactId>mysql-connector-java</artifactId>
-            <version>8.0.33</version>
-        </dependency>
     </dependencies>
     <name>QueueJavaFX</name>
 </project>

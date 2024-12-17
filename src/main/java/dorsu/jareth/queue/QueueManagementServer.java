@@ -1,13 +1,26 @@
 package dorsu.jareth.queue;
 
+import java.io.File;
+import java.io.IOException;
 import org.java_websocket.server.WebSocketServer;
 import org.java_websocket.WebSocket;
 import org.java_websocket.handshake.ClientHandshake;
 
 import java.net.InetSocketAddress;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.sql.*;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.PDPage;
+import org.apache.pdfbox.pdmodel.PDPageContentStream;
+import org.apache.pdfbox.pdmodel.font.PDFont;
+import org.apache.pdfbox.pdmodel.font.PDType1Font;
+import org.apache.pdfbox.pdmodel.font.Standard14Fonts;
 
 public class QueueManagementServer extends WebSocketServer {
 
@@ -74,15 +87,66 @@ public class QueueManagementServer extends WebSocketServer {
 
     private void issueNewTicket(WebSocket conn) {
         try {
-            String newTicket = "Ticket-" + (getLastTicketNumber() + 1);
-            String sql = "INSERT INTO tickets (ticket_number) VALUES (?)";
+            int newTicketNumber = getLastTicketNumber() + 1;
+            String newTicket = "Ticket-" + newTicketNumber;
+            String sql = "INSERT INTO tickets (ticket_number, status, created_at) VALUES (?, 'PENDING', NOW())";  //Added status and timestamp
             PreparedStatement stmt = connection.prepareStatement(sql);
             stmt.setString(1, newTicket);
             stmt.executeUpdate();
             conn.send("New ticket issued: " + newTicket);
             broadcastQueueStatus();
+
+            // Generate PDF after successful ticket creation
+            try {
+                generateTicketPDF(newTicket);
+                conn.send("Ticket PDF generated: ticket_" + newTicketNumber + ".pdf"); //Inform client
+            } catch (IOException e) {
+                conn.send("Error generating PDF: " + e.getMessage()); //Inform client of PDF error
+                System.err.println("Error generating PDF: " + e.getMessage());  //Log the error
+            }
+
         } catch (SQLException e) {
             conn.send("Error issuing a new ticket: " + e.getMessage());
+            System.err.println("SQL Error: " + e.getMessage()); //Log the SQL error
+        }
+    }
+
+    private void generateTicketPDF(String ticketNumber) throws IOException {
+        // Create the "tickets" directory if it doesn't exist
+        Path ticketsDirectory = Paths.get("tickets");
+        if (!Files.exists(ticketsDirectory)) {
+            Files.createDirectories(ticketsDirectory);
+        }
+
+        try (PDDocument document = new PDDocument()) {
+            PDPage page = new PDPage();
+            document.addPage(page);
+            PDFont pdfFont = new PDType1Font(Standard14Fonts.FontName.TIMES_ROMAN);
+            try (PDPageContentStream contentStream = new PDPageContentStream(document, page)) {
+                contentStream.beginText();
+                contentStream.setFont(pdfFont, 12);
+
+                contentStream.setLeading(15); // Set leading (space between lines)
+
+                float yOffset = 750; // Starting y-coordinate
+                contentStream.newLineAtOffset(50, yOffset);
+                contentStream.showText("Ticket Number: " + ticketNumber);
+                yOffset -= 20; // Adjust y-coordinate for next line
+
+                contentStream.newLineAtOffset(0, -20); // Move to the next line
+                contentStream.showText("Status: PENDING");
+                yOffset -= 20; // Adjust y-coordinate for next line
+
+                contentStream.newLineAtOffset(0, -20); // Move to the next line
+                contentStream.showText("Issued on: " + LocalDateTime.now().format(DateTimeFormatter.ofPattern("MMMM dd, yyyy hh:mm a")));
+                contentStream.endText();
+                contentStream.close();
+                String filePath = ticketsDirectory.resolve("ticket_" + ticketNumber.substring(7) + ".pdf").toString();
+                document.save(new File(filePath));
+            }
+            // Save the PDF in the "tickets" directory
+            String filePath = ticketsDirectory.resolve("ticket_" + ticketNumber.substring(7) + ".pdf").toString();
+            document.save(new File(filePath));
         }
     }
 
@@ -164,11 +228,11 @@ public class QueueManagementServer extends WebSocketServer {
     }
 
     public static void main(String[] args) {
-        InetSocketAddress address = new InetSocketAddress("localhost", 9090);
+        InetSocketAddress address = new InetSocketAddress("localhost", 8080);
         QueueManagementServer server = new QueueManagementServer(address);
         try {
             server.start();
-            System.out.println("Queue Management WebSocket server started on port 9090");
+            System.out.println("Queue Management WebSocket server started on port 8080");
 
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
                 try {

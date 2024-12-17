@@ -1,13 +1,13 @@
 package dorsu.jareth.auth;
 
-import dorsu.jareth.queue.QueueManagementApp;
-import dorsu.jareth.queue.QueueManagementServer;
-import java.net.InetSocketAddress;
+import dorsu.jareth.queue.Dashboard;
+import java.net.URISyntaxException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import javafx.application.Application;
+import javafx.application.Platform;
 import javafx.event.ActionEvent;
 import javafx.scene.Scene;
 import javafx.scene.control.Alert;
@@ -29,11 +29,20 @@ public class Authentication extends Application {
 
     private Scene loginScene;
     private Scene registerScene;
+    private Stage authStage;
 
     @Override
     public void start(Stage primaryStage) {
+        primaryStage.setOnCloseRequest(event -> {
+            // Perform any necessary cleanup or actions before exiting
+            System.out.println("Application closing..."); // Optional: Log the event
+            // You might add code here to save data, close resources, etc.
+            Platform.exit(); //Ensure the application exits cleanly
+            System.exit(0); // Ensure the JVM exits
+        });
+        authStage = primaryStage;
         // Create the Login Scene
-        primaryStage.setTitle("Authentication");
+        primaryStage.setTitle("Queue Management System - Authentication");
 
         // Left panel for login
         AnchorPane leftPaneLogin = new AnchorPane();
@@ -49,10 +58,10 @@ public class Authentication extends Application {
         logoImageView.setLayoutY(50);  // Adjust the Y position as needed
 
         // Add "DOrSU" and "Queue Management System" as separate Text elements
-        Text dorsuText = new Text("DOrSU");
+        Text dorsuText = new Text("DOrSU BC");
         dorsuText.setFill(Color.WHITE);
         dorsuText.setFont(Font.font(24)); // Adjust font size as needed
-        dorsuText.setLayoutX(115); // Center alignment below the logo
+        dorsuText.setLayoutX(98); // Center alignment below the logo
         dorsuText.setLayoutY(225);
 
         Text queueManagementText = new Text("Queue Management System");
@@ -106,8 +115,12 @@ public class Authentication extends Application {
                 return;
             }
 
-            // Call the login method to validate user credentials
-            handleLogin(username, password);
+            try {
+                // Call the login method to validate user credentials
+                handleLogin(username, password);
+            } catch (URISyntaxException e) {
+                
+            }
         });
 
         Text registerText = new Text("Don't have an account? ");
@@ -149,10 +162,10 @@ public class Authentication extends Application {
         logoImageView2.setLayoutY(50);  // Adjust the Y position as needed
 
         // Add "DOrSU" and "Queue Management System" as separate Text elements
-        Text dorsuText2 = new Text("DOrSU");
+        Text dorsuText2 = new Text("DOrSU BC");
         dorsuText2.setFill(Color.WHITE);
         dorsuText2.setFont(Font.font(24)); // Adjust font size as needed
-        dorsuText2.setLayoutX(115); // Center alignment below the logo
+        dorsuText2.setLayoutX(98); // Center alignment below the logo
         dorsuText2.setLayoutY(225);
 
         Text queueManagementText2 = new Text("Queue Management System");
@@ -289,13 +302,13 @@ public class Authentication extends Application {
             }
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            System.out.println("Error: " + e.getMessage());
             showAlert("Database Error", "There was a problem connecting to the database.", AlertType.ERROR);
         }
     }
 // Handle Login
 
-    private void handleLogin(String username, String password) {
+    private void handleLogin(String username, String password) throws URISyntaxException {
         String query = "SELECT * FROM users WHERE username = ? AND password = ?";
 
         try (Connection conn = DatabaseConnection.getConnection(); PreparedStatement stmt = conn.prepareStatement(query)) {
@@ -309,8 +322,6 @@ public class Authentication extends Application {
                 showAlert("Login Successful", "Welcome, " + username, AlertType.INFORMATION);
                 // Redirect to another scene, for example, a dashboard
 
-                // Start the QueueManagementServer
-                startQueueManagementServer();
 
                 // Switch to the main scene (QueueManagementApp)
                 switchToDashboardScene();
@@ -321,7 +332,7 @@ public class Authentication extends Application {
             }
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            System.out.println("Error: " + e.getMessage());
             showAlert("Database Error", "There was a problem connecting to the database.", AlertType.ERROR);
         }
     }
@@ -334,28 +345,14 @@ public class Authentication extends Application {
         alert.showAndWait();
     }
 
-    private void startQueueManagementServer() {
-        // Define the IP address and port for the server
-        InetSocketAddress serverAddress = new InetSocketAddress("localhost", 9090); // Change as needed
+    
 
-        // Initialize and start the QueueManagementServer with the address
-        QueueManagementServer server = new QueueManagementServer(serverAddress);
-        new Thread(() -> {
-            try {
-                server.start(); // Assuming the startServer() method starts the server
-            } catch (Exception e) {
-                e.printStackTrace();
-                showAlert("Server Error", "Could not start the server.", Alert.AlertType.ERROR);
-            }
-        }).start();
-    }
-
-    private void switchToDashboardScene() {
-        // Create a new thread to run the QueueManagementApp without blocking the main thread
-        new Thread(() -> {
-            // Launch the QueueManagementApp (which is a JavaFX Application)
-            QueueManagementApp.launch(QueueManagementApp.class);
-        }).start();
+    private void switchToDashboardScene() throws URISyntaxException {
+        Dashboard app = new Dashboard();
+        Stage primaryStage = new Stage();
+        app.start(primaryStage);
+        primaryStage.show();
+        this.authStage.close(); // Close the Authentication stage
     }
 
     public static void main(String[] args) {
